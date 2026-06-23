@@ -1,0 +1,62 @@
+"""FastAPI application wiring: routers, error shape, CORS, and seed data."""
+
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from .routers import auth, games, leaderboard
+from .store import store
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    store.reset_and_seed()
+    yield
+
+
+app = FastAPI(
+    title="Snake Arena Online Backend API",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+# Allow the Vite dev server to call the API during local development.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_request: Request, exc: HTTPException) -> JSONResponse:
+    # Render errors as { "message": ... } to match the spec's Error schema.
+    detail = exc.detail if isinstance(exc.detail, str) else "Error"
+    return JSONResponse(status_code=exc.status_code, content={"message": detail})
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    _request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    errors = exc.errors()
+    message = errors[0]["msg"] if errors else "Invalid request"
+    return JSONResponse(status_code=400, content={"message": message})
+
+
+# Spec server is mounted at /api.
+app.include_router(auth.router, prefix="/api")
+app.include_router(leaderboard.router, prefix="/api")
+app.include_router(games.router, prefix="/api")
+
+
+@app.get("/health", include_in_schema=False)
+async def health() -> dict[str, str]:
+    return {"status": "ok"}
