@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import asyncio
 
+from app.db import SessionLocal
 from app.events import Broker, games_list_broker
-from app.routers.games import _sse
-from app.store import store
+from app.routers.games import _notify, _sse
 
 START_BODY = {
     "mode": "walls",
@@ -98,12 +98,13 @@ def test_broker_delivers_payload_to_subscribers():
     assert asyncio.run(run()) == {"hello": "world"}
 
 
-def test_notify_list_publishes_active_game_snapshot(client):
-    # The /games/stream endpoint relays exactly what notify_list() publishes.
+def test_notify_publishes_active_game_snapshot(client):
+    # The /games/stream endpoint relays exactly what _notify() publishes.
     async def run():
         queue = games_list_broker.subscribe()
         try:
-            store.notify_list()
+            with SessionLocal() as db:
+                _notify(db, "g_none")
             return await asyncio.wait_for(queue.get(), 1)
         finally:
             games_list_broker.unsubscribe(queue)

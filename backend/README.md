@@ -44,6 +44,22 @@ uv run uvicorn app.main:app --reload --port 8000
 The live docs are generated from the actual routes — compare them against the
 project's `openapi.yaml` to confirm the backend matches the agreed API.
 
+## Database
+
+Persistence uses SQLAlchemy and is configured entirely by the `DATABASE_URL`
+environment variable, so the same code runs on SQLite or Postgres:
+
+```bash
+# SQLite (single file, zero setup)
+DATABASE_URL=sqlite:///./snake.db
+
+# Postgres
+DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/snake_arena
+```
+
+Set it in `backend/.env` (gitignored). Tables are created and seed data is
+inserted on first startup. `*.db` files are local state and are gitignored.
+
 ## Auth
 
 JWTs are signed with HS256. Set `SNAKE_JWT_SECRET` in production; in dev a
@@ -62,5 +78,9 @@ Logout adds the token's `jti` to an in-memory deny-list so it stops working.
 
 ```bash
 cd backend
-uv run pytest
+uv run pytest                  # fast unit tests (in-memory SQLite)
+uv run pytest tests_integration/   # integration tests (on-disk SQLite)
 ```
+
+Or via the Makefile from the repo root: `make backend-tests` and
+`make test-integration`.

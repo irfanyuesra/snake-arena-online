@@ -1,19 +1,31 @@
-"""Shared test fixtures.
+"""Shared fixtures for the fast unit tests.
 
-Each test gets a fresh TestClient whose lifespan re-seeds the in-memory store,
-so tests are independent and order-insensitive.
+These run against a fresh in-memory SQLite database, recreated and reseeded for
+every test so they are independent and order-insensitive.
 """
 
 from __future__ import annotations
 
+import os
+
+# Must be set before importing the app so the engine binds to in-memory SQLite.
+os.environ.setdefault("DATABASE_URL", "sqlite://")
+
 import pytest
 from fastapi.testclient import TestClient
 
+from app.db import Base, SessionLocal, create_all, engine
 from app.main import app
+from app.seed import seed
 
 
 @pytest.fixture
 def client():
+    create_all()
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    with SessionLocal() as db:
+        seed(db)
     with TestClient(app) as test_client:
         yield test_client
 

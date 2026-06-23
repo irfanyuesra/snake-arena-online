@@ -2,7 +2,8 @@
 
 Passwords are hashed with PBKDF2-HMAC-SHA256 from the standard library (no
 native build dependencies). Bearer tokens are signed JWTs (HS256). Logout adds
-the token's ``jti`` to an in-memory deny-list so it stops authenticating.
+the token's ``jti`` to the ``revoked_tokens`` table so it stops authenticating,
+surviving restarts.
 """
 
 from __future__ import annotations
@@ -15,9 +16,11 @@ import time
 import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.orm import Session
 
+from . import crud
+from .db import get_db
 from .models import User
-from .store import store
 
 _PBKDF2_ITERATIONS = 100_000
 
@@ -67,36 +70,41 @@ def _decode(token: str) -> dict | None:
         return None
 
 
-def revoke_token(token: str | None) -> None:
+def revoke_token(db: Session, token: str | None) -> None:
     if not token:
         return
     payload = _decode(token)
     if payload and payload.get("jti"):
-        store.revoked.add(payload["jti"])
+        crud.revoke_jti(db, payload["jti"])
 
 
-def _user_from_token(token: str | None) -> User | None:
+def _user_from_token(db: Session, token: str | None) -> User | None:
     if not token:
         return None
     payload = _decode(token)
-    if not payload or payload.get("jti") in store.revoked:
+    if not payload:
         return None
-    record = store.users.get(payload.get("sub", ""))
-    return User(id=record.id, username=record.username) if record else None
+    jti = payload.get("jti")
+    if jti and crud.is_revoked(db, jti):
+        return None
+    row = crud.get_user(db, payload.get("sub", ""))
+    return crud.to_user(row) if row else None
 
 
 async def optional_user(
     creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: Session = Depends(get_db),
 ) -> User | None:
     """Current user when a valid token is present, otherwise ``None``."""
-    return _user_from_token(creds.credentials if creds else None)
+    return _user_from_token(db, creds.credentials if creds else None)
 
 
 async def require_user(
     creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: Session = Depends(get_db),
 ) -> User:
     """Current user, or 401 when authentication is missing/invalid."""
-    user = _user_from_token(creds.credentials if creds else None)
+    user = _user_from_token(db, creds.credentials if creds else None)
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
     return user

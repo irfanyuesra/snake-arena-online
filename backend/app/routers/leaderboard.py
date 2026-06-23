@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
 
+from .. import crud
 from ..auth import require_user
+from ..db import get_db
 from ..models import GameMode, LeaderboardEntry, SubmitScoreRequest, User
-from ..store import _id, now_ms, store
+from ..util import gen_id, now_ms
 
 router = APIRouter(tags=["Leaderboard"])
 
@@ -15,23 +18,25 @@ router = APIRouter(tags=["Leaderboard"])
 async def get_leaderboard(
     mode: GameMode,
     limit: int = Query(default=10, ge=1, le=100),
+    db: Session = Depends(get_db),
 ) -> list[LeaderboardEntry]:
-    entries = [e for e in store.leaderboard if e.mode == mode]
-    entries.sort(key=lambda e: e.score, reverse=True)
-    return entries[:limit]
+    rows = crud.list_leaderboard(db, mode, limit)
+    return [crud.to_entry(row) for row in rows]
 
 
 @router.post("/leaderboard/scores", response_model=LeaderboardEntry)
 async def submit_score(
-    body: SubmitScoreRequest, user: User = Depends(require_user)
+    body: SubmitScoreRequest,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
 ) -> LeaderboardEntry:
-    entry = LeaderboardEntry(
-        id=_id("lb"),
-        userId=user.id,
+    row = crud.add_score(
+        db,
+        id=gen_id("lb"),
+        user_id=user.id,
         username=user.username,
         mode=body.mode,
         score=body.score,
-        createdAt=now_ms(),
+        created_at=now_ms(),
     )
-    store.leaderboard.append(entry)
-    return entry
+    return crud.to_entry(row)

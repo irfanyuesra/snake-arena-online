@@ -9,13 +9,16 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from .db import SessionLocal, create_all
 from .routers import auth, games, leaderboard
-from .store import store
+from .seed import seed_if_empty
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    store.reset_and_seed()
+    create_all()
+    with SessionLocal() as db:
+        seed_if_empty(db)
     yield
 
 

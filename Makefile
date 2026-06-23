@@ -1,4 +1,4 @@
-.PHONY: install backend frontend backend-tests frontend-tests test dev
+.PHONY: install backend frontend backend-tests frontend-tests test test-integration dev
 
 install:
 	cd backend && uv sync
@@ -17,6 +17,9 @@ frontend-tests:
 	cd frontend && npm test
 
 test: backend-tests frontend-tests
+
+test-integration:
+	cd backend && uv run pytest tests_integration/
 
 dev:
 	trap 'kill 0' EXIT; \
