@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
-# Non-secret committed dev defaults (e.g. backend URL); real secrets go in
+# Non-secret committed env defaults (e.g. backend URL); real secrets go in
 # .env.development.local etc., which stay ignored by the patterns above.
 !.env.development
+!.env.production

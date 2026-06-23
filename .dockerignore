@@ -1,0 +1,11 @@
+.git
+**/node_modules
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/dist
+**/.output
+**/.tanstack
+**/.nitro
+**/*.db
+**/.DS_Store
