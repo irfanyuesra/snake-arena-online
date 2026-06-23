@@ -23,6 +23,10 @@ app = FastAPI(
     title="Snake Arena Online Backend API",
     version="1.0.0",
     lifespan=lifespan,
+    # Serve the interactive docs and schema under /api to match the deployment.
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
 )
 
 # Allow the Vite dev server to call the API during local development.

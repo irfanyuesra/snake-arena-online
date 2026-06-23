@@ -31,7 +31,7 @@ async def signup(body: Credentials) -> AuthResult:
         id=_id("u"), username=username, password_hash=hash_password(body.password)
     )
     store.users[record.id] = record
-    token = issue_token(record.id)
+    token = issue_token(record.id, record.username)
     return AuthResult(user=User(id=record.id, username=record.username), token=token)
 
 
@@ -40,7 +40,7 @@ async def login(body: Credentials) -> AuthResult:
     record = store.user_by_name(body.username.strip())
     if record is None or not verify_password(body.password, record.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    token = issue_token(record.id)
+    token = issue_token(record.id, record.username)
     return AuthResult(user=User(id=record.id, username=record.username), token=token)
 
 

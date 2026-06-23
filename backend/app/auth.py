@@ -1,22 +1,32 @@
-"""Password hashing and bearer-token authentication.
+"""Password hashing and JWT bearer-token authentication.
 
-Passwords are hashed with PBKDF2-HMAC-SHA256 from the standard library, so
-there are no native build dependencies (bcrypt/argon2) to install on Windows.
-Tokens are opaque, generated with ``secrets`` and kept in the in-memory store.
+Passwords are hashed with PBKDF2-HMAC-SHA256 from the standard library (no
+native build dependencies). Bearer tokens are signed JWTs (HS256). Logout adds
+the token's ``jti`` to an in-memory deny-list so it stops authenticating.
 """
 
 from __future__ import annotations
 
 import hashlib
+import os
 import secrets
+import time
 
+import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .models import User
 from .store import store
 
-_ITERATIONS = 100_000
+_PBKDF2_ITERATIONS = 100_000
+
+_JWT_ALGORITHM = "HS256"
+# Set SNAKE_JWT_SECRET in production. In dev we fall back to a per-process
+# random secret (tokens become invalid across restarts, which is fine locally).
+_JWT_SECRET = os.environ.get("SNAKE_JWT_SECRET") or secrets.token_urlsafe(32)
+_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60  # 7 days
+
 # auto_error=False so we can return a friendly 401 / allow optional auth.
 _bearer = HTTPBearer(auto_error=False)
 
@@ -25,7 +35,7 @@ def hash_password(password: str, salt: str | None = None) -> str:
     if salt is None:
         salt = secrets.token_hex(16)
     digest = hashlib.pbkdf2_hmac(
-        "sha256", password.encode("utf-8"), bytes.fromhex(salt), _ITERATIONS
+        "sha256", password.encode("utf-8"), bytes.fromhex(salt), _PBKDF2_ITERATIONS
     )
     return f"{salt}${digest.hex()}"
 
@@ -38,23 +48,40 @@ def verify_password(password: str, stored: str) -> bool:
     return secrets.compare_digest(stored, hash_password(password, salt))
 
 
-def issue_token(user_id: str) -> str:
-    token = secrets.token_urlsafe(32)
-    store.tokens[token] = user_id
-    return token
+def issue_token(user_id: str, username: str) -> str:
+    now = int(time.time())
+    payload = {
+        "sub": user_id,
+        "username": username,
+        "iat": now,
+        "exp": now + _TOKEN_TTL_SECONDS,
+        "jti": secrets.token_hex(8),
+    }
+    return jwt.encode(payload, _JWT_SECRET, algorithm=_JWT_ALGORITHM)
 
 
-def revoke_token(token: str) -> None:
-    store.tokens.pop(token, None)
+def _decode(token: str) -> dict | None:
+    try:
+        return jwt.decode(token, _JWT_SECRET, algorithms=[_JWT_ALGORITHM])
+    except jwt.PyJWTError:
+        return None
+
+
+def revoke_token(token: str | None) -> None:
+    if not token:
+        return
+    payload = _decode(token)
+    if payload and payload.get("jti"):
+        store.revoked.add(payload["jti"])
 
 
 def _user_from_token(token: str | None) -> User | None:
     if not token:
         return None
-    user_id = store.tokens.get(token)
-    if user_id is None:
+    payload = _decode(token)
+    if not payload or payload.get("jti") in store.revoked:
         return None
-    record = store.users.get(user_id)
+    record = store.users.get(payload.get("sub", ""))
     return User(id=record.id, username=record.username) if record else None
 
 

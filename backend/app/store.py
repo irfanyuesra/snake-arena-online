@@ -33,7 +33,7 @@ class UserRecord:
 @dataclass
 class Store:
     users: dict[str, UserRecord] = field(default_factory=dict)
-    tokens: dict[str, str] = field(default_factory=dict)  # token -> user_id
+    revoked: set[str] = field(default_factory=set)  # logged-out token jti values
     leaderboard: list[LeaderboardEntry] = field(default_factory=list)
     games: dict[str, ActiveGame] = field(default_factory=dict)
 
@@ -59,7 +59,7 @@ class Store:
     # --- lifecycle -----------------------------------------------------
     def reset(self) -> None:
         self.users.clear()
-        self.tokens.clear()
+        self.revoked.clear()
         self.leaderboard.clear()
         self.games.clear()
 
