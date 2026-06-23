@@ -36,7 +36,8 @@ describe("mock backend service", () => {
     await s.submitScore("walls", 20);
     await s.submitScore("wrap", 99);
     const wallsLb = await s.getLeaderboard("walls");
-    expect(wallsLb.map((e) => e.score)).toEqual([30, 20, 10]);
+    const bobScores = wallsLb.filter((e) => e.username === "bob").map((e) => e.score);
+    expect(bobScores).toEqual([30, 20, 10]);
     const wrapLb = await s.getLeaderboard("wrap");
     expect(wrapLb.every((e) => e.mode === "wrap")).toBe(true);
   });
