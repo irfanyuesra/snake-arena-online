@@ -9,38 +9,128 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SpectateIndexRouteImport } from './routes/spectate.index'
+import { Route as SpectateIdRouteImport } from './routes/spectate.$id'
 
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeaderboardRoute = LeaderboardRouteImport.update({
+  id: '/leaderboard',
+  path: '/leaderboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SpectateIndexRoute = SpectateIndexRouteImport.update({
+  id: '/spectate/',
+  path: '/spectate/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SpectateIdRoute = SpectateIdRouteImport.update({
+  id: '/spectate/$id',
+  path: '/spectate/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/leaderboard': typeof LeaderboardRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/spectate/$id': typeof SpectateIdRoute
+  '/spectate/': typeof SpectateIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/leaderboard': typeof LeaderboardRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/spectate/$id': typeof SpectateIdRoute
+  '/spectate': typeof SpectateIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/leaderboard': typeof LeaderboardRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/spectate/$id': typeof SpectateIdRoute
+  '/spectate/': typeof SpectateIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/leaderboard'
+    | '/login'
+    | '/signup'
+    | '/spectate/$id'
+    | '/spectate/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/leaderboard'
+    | '/login'
+    | '/signup'
+    | '/spectate/$id'
+    | '/spectate'
+  id:
+    | '__root__'
+    | '/'
+    | '/leaderboard'
+    | '/login'
+    | '/signup'
+    | '/spectate/$id'
+    | '/spectate/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LeaderboardRoute: typeof LeaderboardRoute
+  LoginRoute: typeof LoginRoute
+  SignupRoute: typeof SignupRoute
+  SpectateIdRoute: typeof SpectateIdRoute
+  SpectateIndexRoute: typeof SpectateIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leaderboard': {
+      id: '/leaderboard'
+      path: '/leaderboard'
+      fullPath: '/leaderboard'
+      preLoaderRoute: typeof LeaderboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,12 +138,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/spectate/': {
+      id: '/spectate/'
+      path: '/spectate'
+      fullPath: '/spectate/'
+      preLoaderRoute: typeof SpectateIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/spectate/$id': {
+      id: '/spectate/$id'
+      path: '/spectate/$id'
+      fullPath: '/spectate/$id'
+      preLoaderRoute: typeof SpectateIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LeaderboardRoute: LeaderboardRoute,
+  LoginRoute: LoginRoute,
+  SignupRoute: SignupRoute,
+  SpectateIdRoute: SpectateIdRoute,
+  SpectateIndexRoute: SpectateIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
