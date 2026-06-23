@@ -46,7 +46,7 @@ export interface BackendService {
   submitScore(mode: GameMode, score: number): Promise<LeaderboardEntry>;
 
   // active games / spectating
-  startGame(mode: GameMode, initial: Omit<ActiveGame, "id" | "userId" | "username" | "updatedAt">): Promise<ActiveGame>;
+  startGame(mode: GameMode, initial: Omit<ActiveGame, "id" | "userId" | "username" | "updatedAt" | "mode">): Promise<ActiveGame>;
   updateGame(id: string, patch: Partial<ActiveGame>): Promise<ActiveGame>;
   endGame(id: string): Promise<void>;
   listActiveGames(): Promise<ActiveGame[]>;
