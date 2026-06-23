@@ -1,0 +1,495 @@
+openapi: 3.1.0
+info:
+  title: Snake Arena Online Backend API
+  version: 1.0.0
+  description: >
+    HTTP API expected by the frontend BackendService in frontend/src/services.
+    Authenticated endpoints use the bearer token returned by login or signup.
+servers:
+  - url: /api
+security: []
+tags:
+  - name: Auth
+  - name: Leaderboard
+  - name: Games
+paths:
+  /auth/signup:
+    post:
+      tags: [Auth]
+      summary: Create an account and start a session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Credentials"
+      responses:
+        "200":
+          description: Account created and authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: Username already taken.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Authenticate an existing user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Credentials"
+      responses:
+        "200":
+          description: Authenticated user and bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: End the current session
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Logged out.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Return the current user, or null when unauthenticated
+      description: The frontend calls this during startup. Missing auth is not an error.
+      security: []
+      responses:
+        "200":
+          description: Current user or null.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/User"
+                  - type: "null"
+  /leaderboard:
+    get:
+      tags: [Leaderboard]
+      summary: List leaderboard entries for a game mode
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/GameModeQuery"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+      responses:
+        "200":
+          description: Entries sorted by score descending.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /leaderboard/scores:
+    post:
+      tags: [Leaderboard]
+      summary: Submit a finished score
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitScoreRequest"
+      responses:
+        "200":
+          description: Persisted leaderboard entry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaderboardEntry"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /games:
+    get:
+      tags: [Games]
+      summary: List active games for spectating
+      security: []
+      responses:
+        "200":
+          description: Active games sorted by most recently updated.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActiveGame"
+    post:
+      tags: [Games]
+      summary: Start an active game
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartGameRequest"
+      responses:
+        "200":
+          description: Created active game.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActiveGame"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /games/stream:
+    get:
+      tags: [Games]
+      summary: Subscribe to active game list updates
+      description: >
+        Server-Sent Events stream for subscribeActiveGames. Each event data
+        payload is a JSON array of ActiveGame objects.
+      security: []
+      responses:
+        "200":
+          description: Event stream of active game lists.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                examples:
+                  - "data: [{\"id\":\"g_123\",\"userId\":\"u_123\",\"username\":\"demo\",\"mode\":\"walls\",\"score\":0,\"snake\":[[10,10]],\"food\":[3,4],\"width\":20,\"height\":20,\"alive\":true,\"updatedAt\":1710000000000}]\n\n"
+  /games/{id}:
+    get:
+      tags: [Games]
+      summary: Get one active game for spectating
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/GameId"
+      responses:
+        "200":
+          description: Active game or null when the game has ended or is unknown.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/ActiveGame"
+                  - type: "null"
+    patch:
+      tags: [Games]
+      summary: Update the serialized state of an active game
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GameId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGameRequest"
+      responses:
+        "200":
+          description: Updated active game.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActiveGame"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Games]
+      summary: End an active game
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GameId"
+      responses:
+        "204":
+          description: Game ended.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /games/{id}/stream:
+    get:
+      tags: [Games]
+      summary: Subscribe to one active game's updates
+      description: >
+        Server-Sent Events stream for subscribeActiveGame. Each event data
+        payload is either a JSON ActiveGame object or null when the game ends.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/GameId"
+      responses:
+        "200":
+          description: Event stream of one active game.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                examples:
+                  - "data: {\"id\":\"g_123\",\"userId\":\"u_123\",\"username\":\"demo\",\"mode\":\"walls\",\"score\":1,\"snake\":[[11,10],[10,10]],\"food\":[3,4],\"width\":20,\"height\":20,\"alive\":true,\"updatedAt\":1710000000110}\n\n"
+                  - "data: null\n\n"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  parameters:
+    GameId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      example: g_ab12cd34
+    GameModeQuery:
+      name: mode
+      in: query
+      required: true
+      schema:
+        $ref: "#/components/schemas/GameMode"
+  responses:
+    BadRequest:
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Authentication is required or the token is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    GameMode:
+      type: string
+      enum: [walls, wrap]
+    Cell:
+      type: array
+      prefixItems:
+        - type: integer
+          minimum: 0
+        - type: integer
+          minimum: 0
+      minItems: 2
+      maxItems: 2
+      examples:
+        - [10, 10]
+    User:
+      type: object
+      additionalProperties: false
+      required: [id, username]
+      properties:
+        id:
+          type: string
+          example: u_ab12cd34
+        username:
+          type: string
+          example: demo
+    Credentials:
+      type: object
+      additionalProperties: false
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 1
+          example: demo
+        password:
+          type: string
+          minLength: 1
+          format: password
+          example: demo
+    AuthResult:
+      type: object
+      additionalProperties: false
+      required: [user, token]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+          description: Bearer token used for authenticated endpoints.
+          example: mock
+    LeaderboardEntry:
+      type: object
+      additionalProperties: false
+      required: [id, userId, username, mode, score, createdAt]
+      properties:
+        id:
+          type: string
+          example: lb_ab12cd34
+        userId:
+          type: string
+          example: u_ab12cd34
+        username:
+          type: string
+          example: demo
+        mode:
+          $ref: "#/components/schemas/GameMode"
+        score:
+          type: integer
+          minimum: 0
+          example: 42
+        createdAt:
+          type: integer
+          format: int64
+          description: Unix timestamp in milliseconds.
+          example: 1710000000000
+    ActiveGame:
+      type: object
+      additionalProperties: false
+      required: [id, userId, username, mode, score, snake, food, width, height, alive, updatedAt]
+      properties:
+        id:
+          type: string
+          example: g_ab12cd34
+        userId:
+          type: string
+          example: u_ab12cd34
+        username:
+          type: string
+          example: demo
+        mode:
+          $ref: "#/components/schemas/GameMode"
+        score:
+          type: integer
+          minimum: 0
+          example: 3
+        snake:
+          type: array
+          description: Serialized snake cells, head first.
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Cell"
+        food:
+          $ref: "#/components/schemas/Cell"
+        width:
+          type: integer
+          minimum: 1
+          example: 20
+        height:
+          type: integer
+          minimum: 1
+          example: 20
+        alive:
+          type: boolean
+          example: true
+        updatedAt:
+          type: integer
+          format: int64
+          description: Unix timestamp in milliseconds.
+          example: 1710000000000
+    SubmitScoreRequest:
+      type: object
+      additionalProperties: false
+      required: [mode, score]
+      properties:
+        mode:
+          $ref: "#/components/schemas/GameMode"
+        score:
+          type: integer
+          minimum: 0
+          example: 42
+    StartGameRequest:
+      type: object
+      additionalProperties: false
+      required: [mode, snake, food, score, alive, width, height]
+      properties:
+        mode:
+          $ref: "#/components/schemas/GameMode"
+        snake:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Cell"
+        food:
+          $ref: "#/components/schemas/Cell"
+        score:
+          type: integer
+          minimum: 0
+          example: 0
+        alive:
+          type: boolean
+          example: true
+        width:
+          type: integer
+          minimum: 1
+          example: 20
+        height:
+          type: integer
+          minimum: 1
+          example: 20
+    UpdateGameRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        snake:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Cell"
+        food:
+          $ref: "#/components/schemas/Cell"
+        score:
+          type: integer
+          minimum: 0
+        alive:
+          type: boolean
+        width:
+          type: integer
+          minimum: 1
+        height:
+          type: integer
+          minimum: 1
+    Error:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+          example: Not authenticated
